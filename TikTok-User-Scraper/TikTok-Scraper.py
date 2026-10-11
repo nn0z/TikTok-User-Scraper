@@ -4,10 +4,35 @@ from selenium.webdriver.support.ui import WebDriverWait
 import time
 import random
 import os
+import json
+import re
+
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "output")
+CONFIG_FILE = os.path.join(SCRIPT_DIR, "config.json")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
+def load_config():
+    default_config = {
+        "min_followers": 0,
+        "max_followers": 100000000,
+        "max_users": 100
+    }
+    if not os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_config, f, indent=4)
+        return default_config
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        for key, value in default_config.items():
+            if key not in config:
+                config[key] = value
+        return config
+    except:
+        return default_config
 
 
 def get_output_file(query):
@@ -21,6 +46,22 @@ def get_output_file(query):
         if not os.path.exists(new_path):
             return new_path
         counter += 1
+
+
+def parse_followers(text):
+    if not text or text == "N/A":
+        return None
+    text = text.strip().upper().replace(",", "")
+    try:
+        if text.endswith("K"):
+            return int(float(text[:-1]) * 1_000)
+        if text.endswith("M"):
+            return int(float(text[:-1]) * 1_000_000)
+        if text.endswith("B"):
+            return int(float(text[:-1]) * 1_000_000_000)
+        return int(float(text))
+    except:
+        return None
 
 
 def extract_card_data(card):
@@ -93,8 +134,11 @@ def scroll_and_check(driver, max_steps=30):
     return False
 
 
-def search_tiktok_users(query, max_scrolls=20):
+def search_tiktok_users(query, config):
     output_file = get_output_file(query)
+    min_followers = config.get("min_followers", 0)
+    max_followers = config.get("max_followers", 100000000)
+    max_users = config.get("max_users", 100)
 
     options = uc.ChromeOptions()
     options.add_argument("--headless")
@@ -115,14 +159,23 @@ def search_tiktok_users(query, max_scrolls=20):
         )
 
         seen_users = set()
+        accepted_users = 0
 
         with open(output_file, "w", encoding="utf-8") as f:
             user_cards = driver.find_elements(By.XPATH, "//div[contains(@class, 'DivSearchUserItemContainer')]")
             for card in user_cards:
+                if accepted_users >= max_users:
+                    break
                 data = extract_card_data(card)
                 if not data["user"] or data["user"] == "N/A" or data["user"] in seen_users:
                     continue
+                followers_num = parse_followers(data["followers"])
+                if followers_num is None:
+                    continue
+                if followers_num < min_followers or followers_num > max_followers:
+                    continue
                 seen_users.add(data["user"])
+                accepted_users += 1
                 f.write(f"{data['user']}\n")
                 print(f"name: {data['name']}")
                 print(f"user: {data['user']}")
@@ -132,7 +185,9 @@ def search_tiktok_users(query, max_scrolls=20):
                 print("-" * 60)
             f.flush()
 
-            for scroll_num in range(1, max_scrolls + 1):
+            scroll_num = 0
+            while accepted_users < max_users:
+                scroll_num += 1
                 content_loaded = scroll_and_check(driver)
                 if not content_loaded:
                     break
@@ -141,10 +196,18 @@ def search_tiktok_users(query, max_scrolls=20):
                     By.XPATH, "//div[contains(@class, 'DivSearchUserItemContainer')]"
                 )
                 for card in user_cards:
+                    if accepted_users >= max_users:
+                        break
                     data = extract_card_data(card)
                     if not data["user"] or data["user"] == "N/A" or data["user"] in seen_users:
                         continue
+                    followers_num = parse_followers(data["followers"])
+                    if followers_num is None:
+                        continue
+                    if followers_num < min_followers or followers_num > max_followers:
+                        continue
                     seen_users.add(data["user"])
+                    accepted_users += 1
                     f.write(f"{data['user']}\n")
                     print(f"name: {data['name']}")
                     print(f"user: {data['user']}")
@@ -164,12 +227,7 @@ def search_tiktok_users(query, max_scrolls=20):
 
 
 if __name__ == "__main__":
+    config = load_config()
     search_query = input("Enter a name to search on TikTok: ")
-
-    try:
-        scrolls = int(input("Enter the number of Max scrolls : ") or "20")
-    except:
-        scrolls = 20
-
-    search_tiktok_users(search_query, max_scrolls=scrolls)
+    search_tiktok_users(search_query, config)
     os._exit(0)
