@@ -1,0 +1,5 @@
+{
+    "min_followers": 0,
+    "max_followers": 100000000,
+    "max_users": 100
+}
