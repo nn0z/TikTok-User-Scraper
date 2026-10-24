@@ -1,2 +1,4 @@
-undetected-chromedriver==3.5.5
-selenium==4.15.2
+undetected-chromedriver>=3.5.5
+selenium>=4.15.2
+urllib3>=1.26.18
+certifi>=2024.2.2
