@@ -34,6 +34,6 @@ The tool uses `undetected-chromedriver` to bypass TikTok's bot detection and scr
 
 ---
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 This tool is provided for educational and research purposes only. Scraping data from TikTok may violate their Terms of Service. The developer assumes no liability for any misuse or consequences resulting from the use of this tool. Use it responsibly and at your own risk.
